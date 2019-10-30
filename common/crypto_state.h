@@ -12,6 +12,9 @@ struct crypto_state {
 	struct secret sk, rk;
 	/* Chaining key for re-keying */
 	struct secret s_ck, r_ck;
+
+	/* Do we want to encrypt? */
+	bool encrypt;
 };
 
 void towire_crypto_state(u8 **pptr, const struct crypto_state *cs);

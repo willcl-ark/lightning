@@ -68,6 +68,7 @@ int main(void)
 	struct secret sk, rk, ck;
 	const void *msg;
 	size_t i;
+	cs_out.encrypt = cs_in.encrypt = true;
 
 	setup_tmpctx();
 	msg = tal_dup_arr(tmpctx, char, "hello", 5, 0);
