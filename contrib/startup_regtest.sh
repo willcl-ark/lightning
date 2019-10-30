@@ -55,6 +55,8 @@ fi
 if [ -z "$PATH_TO_BITCOIN" ]; then
 	if [ -d "$HOME/.bitcoin" ]; then
 		PATH_TO_BITCOIN="$HOME/.bitcoin"
+	elif [ -d "$HOME/Library/Application Support/Bitcoin" ]; then
+	  PATH_TO_BITCOIN="$HOME/Library/Application Support/Bitcoin"
 	else
 		echo "\$PATH_TO_BITCOIN not set to a .bitcoin dir?" >&2
 		return
@@ -106,7 +108,38 @@ start_ln() {
 		"$LIGHTNINGD" --lightning-dir=/tmp/l2-regtest
 
 	# Give a hint.
-	echo "Commands: l1-cli, l2-cli, l[1|2]-log, bt-cli, stop_ln, cleanup_ln"
+	echo "Commands: l1-cli, l2-cli, bt-cli, connect_ln, fund_ln, channel_ln, l1_pay_l2, l1_pay_l2, stop_ln, cleanup_ln"
+}
+
+connect_ln() {
+  l1-cli connect \
+    $(l2-cli getinfo | jq '.id') \
+    $(l2-cli getinfo | jq -r '.binding[].address') \
+    $(l2-cli getinfo | jq -r '.binding[].port')
+}
+
+fund_ln() {
+  # Generate 288 blocks to activate segwit then send 1 BTC to each lightning node, confirming it with 6 more blocks
+  bt-cli generatetoaddress 288 $(bt-cli getnewaddress "" bech32)
+  bt-cli sendtoaddress $(l1-cli newaddr | jq -r '.bech32') 1
+  bt-cli sendtoaddress $(l2-cli newaddr | jq -r '.bech32') 1
+  bt-cli generatetoaddress 6 $(bt-cli getnewaddress "" bech32)
+}
+
+channel_ln() {
+  # Open a new channel from l1 to l2 with max amount
+  l1-cli fundchannel $(l2-cli getinfo | jq .id) 16777215 10000
+  bt-cli generatetoaddress 6 $(bt-cli getnewaddress "" bech32)
+}
+
+l1_pay_l2() {
+  # l1 will pay l2 an amount passed as argument
+  l1-cli pay $(l2-cli invoice $argv $(openssl rand -hex 12) $(openssl rand -hex 12) | jq -r '.bolt11')
+}
+
+l2_pay_l1() {
+  # l2 will pay l1 an amount passed as argument
+  l2-cli pay $(l1-cli invoice $argv $(openssl rand -hex 12) $(openssl rand -hex 12) | jq -r '.bolt11')
 }
 
 stop_ln() {
@@ -126,9 +159,12 @@ cleanup_ln() {
 	unalias l1-cli
 	unalias l2-cli
 	unalias bt-cli
-	unalias l1-log
-	unalias l2-log
 	unset -f start_ln
+	unset -f connect_ln
+	unset -f fund_ln
+	unset -f channel_ln
+	unset -f l1_pay_l2
+	unset -f l2_pay_l1
 	unset -f stop_ln
 	unset -f cleanup_ln
 }
