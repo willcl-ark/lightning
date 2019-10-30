@@ -376,6 +376,7 @@ static struct io_plan *handshake_succeeded(struct io_conn *conn,
 
 	cs.rn = cs.sn = 0;
 	cs.r_ck = cs.s_ck = h->ck;
+	cs.encrypt = false;
 
 	cb = h->cb;
 	cbarg = h->cbarg;

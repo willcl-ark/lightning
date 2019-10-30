@@ -103,6 +103,11 @@ u8 *cryptomsg_decrypt_body(const tal_t *ctx,
 		return NULL;
 	decrypted = tal_arr(ctx, u8, inlen - 16);
 
+	if (!cs->encrypt) {
+		memcpy(decrypted, in, inlen - 16);
+		return decrypted;
+	}
+
 	le64_nonce(npub, cs->rn++);
 
 	/* BOLT #8:
@@ -132,26 +137,30 @@ bool cryptomsg_decrypt_header(struct crypto_state *cs, u8 hdr[18], u16 *lenp)
 	unsigned long long mlen;
 	be16 len;
 
-	le64_nonce(npub, cs->rn++);
+	if (!cs->encrypt) {
+		memcpy(&len, hdr, sizeof(len));
+	} else {
 
-	/* BOLT #8:
-	 *
-	 *  2. Let the encrypted length prefix be known as `lc`.
-	 *  3. Decrypt `lc` (using `ChaCha20-Poly1305`, `rn`, and `rk`), to
-	 *     obtain the size of the encrypted packet `l`.
-	 *    * A zero-length byte slice is to be passed as the AD
-	 *	(associated data).
-	 *    * The nonce `rn` MUST be incremented after this step.
-	 */
-	if (crypto_aead_chacha20poly1305_ietf_decrypt((unsigned char *)&len,
-						      &mlen, NULL,
-						      memcheck(hdr, 18), 18,
-						      NULL, 0,
-						      npub, cs->rk.data) != 0) {
-		/* FIXME: Report error! */
-		return false;
+		le64_nonce(npub, cs->rn++);
+
+		/* BOLT #8:
+		 *
+		 *  2. Let the encrypted length prefix be known as `lc`.
+		 *  3. Decrypt `lc` (using `ChaCha20-Poly1305`, `rn`, and `rk`),
+		 *to obtain the size of the encrypted packet `l`.
+		 *    * A zero-length byte slice is to be passed as the AD
+		 *	(associated data).
+		 *    * The nonce `rn` MUST be incremented after this step.
+		 */
+		if (crypto_aead_chacha20poly1305_ietf_decrypt(
+			(unsigned char *)&len, &mlen, NULL, memcheck(hdr, 18),
+			18, NULL, 0, npub, cs->rk.data) != 0) {
+			/* FIXME: Report error! */
+			return false;
+		}
+		assert(mlen == sizeof(len));
 	}
-	assert(mlen == sizeof(len));
+
 	*lenp = be16_to_cpu(len);
 	return true;
 }
@@ -181,6 +190,16 @@ u8 *cryptomsg_encrypt_msg(const tal_t *ctx,
 	 *   2. Serialize `l` into 2 bytes encoded as a big-endian integer.
 	 */
 	l = cpu_to_be16(mlen);
+
+	if (!cs->encrypt) {
+		memcpy(out, &l, sizeof(l));
+		memset(out + sizeof(l), 0, 16);
+		memcpy(out + sizeof(l) + 16, msg, mlen);
+		memset(out + sizeof(l) + 16 + mlen, 0, 16);
+        if (taken(msg))
+            tal_free(msg);
+		return out;
+	}
 
 	/* BOLT #8:
 	 *
