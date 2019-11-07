@@ -95,7 +95,7 @@ static void do_generate(int argc, char **argv,
 	u8 *serialized = serialize_onionpacket(ctx, res);
 	if (!serialized)
 		errx(1, "Error serializing message.");
-	printf("%s\n", tal_hex(ctx, serialized));
+	printf("%s", tal_hex(ctx, serialized));
 	tal_free(ctx);
 }
 
