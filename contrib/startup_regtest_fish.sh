@@ -121,7 +121,7 @@ function start_ln
 	fund_ln
 
 	# Give a hint.
-	echo "Commands: l1-cli, l2-cli, l3-cli, bt-cli, fund_ln, connect_ln, connect_ln_proxy, channel_ln, l1_pay_l2, l1_pay_l3, l2_pay_l1, l2_pay_l3, 13_pay_l1, l3_pay_l1, stop_ln, cleanup_ln"
+	echo "Commands: l1-cli, l2-cli, l3-cli, bt-cli, fund_ln, connect_ln, connect_ln_proxy, channel_ln, l1_pay_l2, l1_pay_l3, l2_pay_l1, l2_pay_l3, stop_ln, cleanup_ln"
 end
 
 function fund_ln
@@ -140,9 +140,9 @@ function connect_ln
 end
 
 function connect_ln_proxy
-  # Connect l1 to l2 and l2 to l3 via the Unix Domain Proxy
-  l1-cli connect (l2-cli getinfo | jq .id) /tmp/unix_proxy2_remotes
-  l2-cli connect (l3-cli getinfo | jq .id) /tmp/unix_proxy3_remotes
+  # Connect l1 to l2 via the Unix Domain Proxy and l2 to l3 via direct Unix Domain Socket
+  l1-cli connect (l2-cli getinfo | jq .id) /tmp/unix_proxy
+  l2-cli connect (l3-cli getinfo | jq .id) (l3-cli getinfo | jq .binding[].socket)
 end
 
 function channel_ln
@@ -170,16 +170,6 @@ end
 function l2_pay_l3
   # l2 will pay l1 an amount passed as argument
   l2-cli pay (l3-cli invoice $argv (openssl rand -hex 12) (openssl rand -hex 12) | jq -r '.bolt11')
-end
-
-function l3_pay_l1
-  # l2 will pay l1 an amount passed as argument
-  l3-cli pay (l1-cli invoice $argv (openssl rand -hex 12) (openssl rand -hex 12) | jq -r '.bolt11')
-end
-
-function l3_pay_l2
-  # l2 will pay l1 an amount passed as argument
-  l3-cli pay (l2-cli invoice $argv (openssl rand -hex 12) (openssl rand -hex 12) | jq -r '.bolt11')
 end
 
 function stop_ln
