@@ -62,7 +62,7 @@ if [ -z $PATH_TO_BITCOIN ]
   end
 end
 
-mkdir -p /tmp/l1-regtest /tmp/l2-regtest
+mkdir -p /tmp/l1-regtest /tmp/l2-regtest /tmp/l3-regtest
 
 # Node one config
 echo "network=regtest
@@ -81,11 +81,22 @@ log-file=/tmp/l2-regtest/log
 #addr=localhost:9090
 bind-addr=/tmp/l2-regtest/unix_socket" > /tmp/l2-regtest/config
 
+# Node three config
+echo "network=regtest
+network=regtest
+daemon
+log-level=io
+log-file=/tmp/l3-regtest/log
+#addr=localhost:12120
+bind-addr=/tmp/l3-regtest/unix_socket" > /tmp/l3-regtest/config
+
 alias l1-cli='$LCLI --lightning-dir=/tmp/l1-regtest'
 alias l2-cli='$LCLI --lightning-dir=/tmp/l2-regtest'
+alias l3-cli='$LCLI --lightning-dir=/tmp/l3-regtest'
 alias bt-cli='bitcoin-cli -regtest'
 alias l1-log='less /tmp/l1-regtest/log'
 alias l2-log='less /tmp/l2-regtest/log'
+alias l3-log='less /tmp/l3-regtest/log'
 
 function start_ln
 	# Start bitcoind in the background
@@ -103,10 +114,14 @@ function start_ln
 
 	# Start the lightning nodes
 	test -f /tmp/l1-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l1-regtest
-	test  -f /tmp/l2-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l2-regtest
+	test -f /tmp/l2-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l2-regtest
+	test -f /tmp/l3-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l3-regtest
+
+	# fund the nodes
+	fund_ln
 
 	# Give a hint.
-	echo "Commands: l1-cli, l2-cli, bt-cli, fund_ln, connect_ln, connect_ln_proxy, channel_ln, l1_pay_l2, l2_pay_l1, stop_ln, cleanup_ln"
+	echo "Commands: l1-cli, l2-cli, l3-cli, bt-cli, fund_ln, connect_ln, connect_ln_proxy, channel_ln, l1_pay_l2, l1_pay_l3, l2_pay_l1, l2_pay_l3, 13_pay_l1, l3_pay_l1, stop_ln, cleanup_ln"
 end
 
 function fund_ln
@@ -114,22 +129,26 @@ function fund_ln
   bt-cli generatetoaddress 288 (bt-cli getnewaddress "" bech32)
   bt-cli sendtoaddress (l1-cli newaddr | jq -r '.bech32') 1
   bt-cli sendtoaddress (l2-cli newaddr | jq -r '.bech32') 1
+  bt-cli sendtoaddress (l3-cli newaddr | jq -r '.bech32') 1
   bt-cli generatetoaddress 6 (bt-cli getnewaddress "" bech32)
 end
 
 function connect_ln
-  # Connect the two nodes together via the Unix Domain Socket
+  # Connect l1 to l2, and l2 to l3 via their Unix Domain Sockets
   l1-cli connect (l2-cli getinfo | jq .id) (l2-cli getinfo | jq .binding[].socket)
+  l2-cli connect (l3-cli getinfo | jq .id) (l3-cli getinfo | jq .binding[].socket)
 end
 
 function connect_ln_proxy
-  # Connect the two nodes together via the Unix Domain Proxy
+  # Connect l1 to l2 via the Unix Domain Proxy and l2 to l3 via direct Unix Domain Socket
   l1-cli connect (l2-cli getinfo | jq .id) /tmp/unix_proxy
+  l2-cli connect (l3-cli getinfo | jq .id) (l3-cli getinfo | jq .binding[].socket)
 end
 
 function channel_ln
-  # Open a new channel from l1 to l2 with max amount
+  # Open a new channel from l1 to l2 and from l2 to l3 with max amount
   l1-cli fundchannel (l2-cli getinfo | jq .id) 16777215 10000
+  l2-cli fundchannel (l3-cli getinfo | jq .id) 16777215 10000
   bt-cli generatetoaddress 6 (bt-cli getnewaddress "" bech32)
 end
 
@@ -138,15 +157,36 @@ function l1_pay_l2
   l1-cli pay (l2-cli invoice $argv (openssl rand -hex 12) (openssl rand -hex 12) | jq -r '.bolt11')
 end
 
+function l1_pay_l3
+  # l1 will pay l2 an amount passed as argument
+  l1-cli pay (l3-cli invoice $argv (openssl rand -hex 12) (openssl rand -hex 12) | jq -r '.bolt11')
+end
+
 function l2_pay_l1
   # l2 will pay l1 an amount passed as argument
   l2-cli pay (l1-cli invoice $argv (openssl rand -hex 12) (openssl rand -hex 12) | jq -r '.bolt11')
+end
+
+function l2_pay_l3
+  # l2 will pay l1 an amount passed as argument
+  l2-cli pay (l3-cli invoice $argv (openssl rand -hex 12) (openssl rand -hex 12) | jq -r '.bolt11')
+end
+
+function l3_pay_l1
+  # l2 will pay l1 an amount passed as argument
+  l3-cli pay (l1-cli invoice $argv (openssl rand -hex 12) (openssl rand -hex 12) | jq -r '.bolt11')
+end
+
+function l3_pay_l2
+  # l2 will pay l1 an amount passed as argument
+  l3-cli pay (l2-cli invoice $argv (openssl rand -hex 12) (openssl rand -hex 12) | jq -r '.bolt11')
 end
 
 function stop_ln
   # Stop both lightning nodes and bitcoind
 	test ! -f /tmp/l1-regtest/lightningd-regtest.pid || kill (cat "/tmp/l1-regtest/lightningd-regtest.pid"); rm /tmp/l1-regtest/lightningd-regtest.pid
 	test ! -f /tmp/l2-regtest/lightningd-regtest.pid || kill (cat "/tmp/l2-regtest/lightningd-regtest.pid"); rm /tmp/l2-regtest/lightningd-regtest.pid
+	test ! -f /tmp/l3-regtest/lightningd-regtest.pid || kill (cat "/tmp/l3-regtest/lightningd-regtest.pid"); rm /tmp/l3-regtest/lightningd-regtest.pid
 	test ! -f "$PATH_TO_BITCOIN/regtest/bitcoind.pid" || kill (cat "$PATH_TO_BITCOIN/regtest/bitcoind.pid"); rm "$PATH_TO_BITCOIN/regtest/bitcoind.pid"
 end
 
@@ -157,6 +197,8 @@ function cleanup_ln
 	functions -e l1-log
 	functions -e l2-cli
 	functions -e l2-log
+	functions -e l3-cli
+	functions -e l3-log
 	functions -e bt-cli
 	functions -e start_ln
 	functions -e stop_ln
@@ -166,5 +208,6 @@ function cleanup_ln
 	set -e LCLI
 	rm -Rf /tmp/l1-regtest/
 	rm -Rf /tmp/l2-regtest/
+	rm -Rf /tmp/l3-regtest/
 	rm -Rf "$PATH_TO_BITCOIN/regtest"
 end
