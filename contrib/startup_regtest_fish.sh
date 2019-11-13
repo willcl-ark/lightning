@@ -140,9 +140,9 @@ function connect_ln
 end
 
 function connect_ln_proxy
-  # Connect l1 to l2 via the Unix Domain Proxy and l2 to l3 via direct Unix Domain Socket
-  l1-cli connect (l2-cli getinfo | jq .id) /tmp/unix_proxy
-  l2-cli connect (l3-cli getinfo | jq .id) (l3-cli getinfo | jq .binding[].socket)
+  # Connect l1 to l2 and l2 to l3 via the Unix Domain Proxy
+  l1-cli connect (l2-cli getinfo | jq .id) /tmp/unix_proxy2_remotes
+  l2-cli connect (l3-cli getinfo | jq .id) /tmp/unix_proxy3_remotes
 end
 
 function channel_ln
