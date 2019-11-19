@@ -121,7 +121,8 @@ function start_ln
 	fund_ln
 
 	# Give a hint.
-	echo "Commands: l1-cli, l2-cli, l3-cli, bt-cli, fund_ln, connect_ln, connect_ln_proxy, channel_ln, l1_pay_l2, l1_pay_l3, l2_pay_l1, l2_pay_l3, 13_pay_l1, l3_pay_l1, stop_ln, cleanup_ln"
+	echo "Commands: l1-cli, l2-cli, l3-cli, bt-cli, fund_ln, connect_ln, connect_ln_proxy, channel_ln, l1_pay_l2,
+	l1_pay_l3, l2_pay_l1, l2_pay_l3, 13_pay_l1, l3_pay_l1, stop_ln, cleanup_ln, set_ln_fees"
 end
 
 function fund_ln
@@ -150,6 +151,20 @@ function channel_ln
   l1-cli fundchannel (l2-cli getinfo | jq .id) 16777215 10000
   l2-cli fundchannel (l3-cli getinfo | jq .id) 16777215 10000
   bt-cli generatetoaddress 6 (bt-cli getnewaddress "" bech32)
+  set_ln_fees 0 0
+end
+
+function set_ln_fees
+  # Set the fees for all channels to zero
+  for channel in (l1-cli listfunds | jq .channels[].peer_id)
+    l1-cli setchannelfee $channel $argv[1] $argv[2]
+  end
+  for channel in (l2-cli listfunds | jq .channels[].peer_id)
+    l2-cli setchannelfee $channel $argv[1] $argv[2]
+  end
+  for channel in (l3-cli listfunds | jq .channels[].peer_id)
+    l3-cli setchannelfee $channel $argv[1] $argv[2]
+  end
 end
 
 function l1_pay_l2
@@ -203,6 +218,7 @@ function cleanup_ln
 	functions -e start_ln
 	functions -e stop_ln
 	functions -e cleanup_ln
+	functions -e set_ln_fees
 	set -e PATH_TO_LIGHTNING
 	set -e LIGHTNINGD
 	set -e LCLI
