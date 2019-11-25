@@ -121,7 +121,7 @@ function start_ln
 	fund_ln
 
 	# Give a hint.
-	echo "Commands: l1-cli, l2-cli, l3-cli, bt-cli, fund_ln, connect_ln, connect_ln_proxy, channel_ln, l1_pay_l2,
+	echo "Commands: l1-cli, l2-cli, l3-cli, bt-cli, fund_ln, connect_ln, connect_ln_proxy, channel_ln, channel_ln_priv, l1_pay_l2,
 	l1_pay_l3, l2_pay_l1, l2_pay_l3, 13_pay_l1, l3_pay_l1, stop_ln, cleanup_ln, set_ln_fees"
 end
 
@@ -150,6 +150,14 @@ function channel_ln
   # Open a new channel from l1 to l2 and from l2 to l3 with max amount
   l1-cli fundchannel (l2-cli getinfo | jq .id) 16777215 10000
   l2-cli fundchannel (l3-cli getinfo | jq .id) 16777215 10000
+  bt-cli generatetoaddress 6 (bt-cli getnewaddress "" bech32)
+  set_ln_fees 0 0
+end
+
+function channel_ln_priv
+  # Open a new channel from l1 to l2 and from l2 to l3 with max amount
+  l1-cli fundchannel (l2-cli getinfo | jq .id) 16777215 10000 false
+  l2-cli fundchannel (l3-cli getinfo | jq .id) 16777215 10000 false
   bt-cli generatetoaddress 6 (bt-cli getnewaddress "" bech32)
   set_ln_fees 0 0
 end
@@ -219,6 +227,7 @@ function cleanup_ln
 	functions -e stop_ln
 	functions -e cleanup_ln
 	functions -e set_ln_fees
+	functions -e channel_ln_priv
 	set -e PATH_TO_LIGHTNING
 	set -e LIGHTNINGD
 	set -e LCLI
