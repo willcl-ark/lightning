@@ -113,9 +113,9 @@ function start_ln
 	end
 
 	# Start the lightning nodes
-	test -f /tmp/l1-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l1-regtest
-	test -f /tmp/l2-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l2-regtest
-	test -f /tmp/l3-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l3-regtest
+	test -f /tmp/l1-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l1-regtest --plugin=/Users/will/src/lnproxy/scripts/gotenna.py
+	test -f /tmp/l2-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l2-regtest --plugin=/Users/will/src/lnproxy/scripts/gotenna.py
+	test -f /tmp/l3-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l3-regtest --plugin=/Users/will/src/lnproxy/scripts/gotenna.py
 
 	# fund the nodes
 	fund_ln
@@ -127,7 +127,7 @@ end
 
 function fund_ln
   # Generate 288 blocks to activate segwit then send 1 BTC to each lightning node, confirming it with 6 more blocks
-  bt-cli generatetoaddress 288 (bt-cli getnewaddress "" bech32)
+  bt-cli generatetoaddress 101 (bt-cli getnewaddress "" bech32)
   bt-cli sendtoaddress (l1-cli newaddr | jq -r '.bech32') 1
   bt-cli sendtoaddress (l2-cli newaddr | jq -r '.bech32') 1
   bt-cli sendtoaddress (l3-cli newaddr | jq -r '.bech32') 1
@@ -141,9 +141,9 @@ function connect_ln
 end
 
 function connect_ln_proxy
-  # Connect l1 to l2 and l2 to l3 via the Unix Domain Proxy
-  l1-cli connect (l2-cli getinfo | jq .id) /tmp/unix_proxy1_local
-  l2-cli connect (l3-cli getinfo | jq .id) /tmp/unix_proxy2_local
+  # Connect l1 to l2 and l2 to l3 via their proxy listening addresses
+  l1-cli proxy-connect (l2-cli getinfo | jq .id) (l2-cli proxy-addr | jq .addr)
+  l2-cli proxy-connect (l3-cli getinfo | jq .id) (l3-cli proxy-addr | jq .addr)
 end
 
 function channel_ln
@@ -210,6 +210,8 @@ function stop_ln
 	test ! -f /tmp/l1-regtest/lightningd-regtest.pid || kill (cat "/tmp/l1-regtest/lightningd-regtest.pid"); rm /tmp/l1-regtest/lightningd-regtest.pid
 	test ! -f /tmp/l2-regtest/lightningd-regtest.pid || kill (cat "/tmp/l2-regtest/lightningd-regtest.pid"); rm /tmp/l2-regtest/lightningd-regtest.pid
 	test ! -f /tmp/l3-regtest/lightningd-regtest.pid || kill (cat "/tmp/l3-regtest/lightningd-regtest.pid"); rm /tmp/l3-regtest/lightningd-regtest.pid
+	# kill any plugins that might still be floating around
+	pkill -f /Users/will/src/lnproxy/scripts/gotenna.py
 	test ! -f "$PATH_TO_BITCOIN/regtest/bitcoind.pid" || kill (cat "$PATH_TO_BITCOIN/regtest/bitcoind.pid"); rm "$PATH_TO_BITCOIN/regtest/bitcoind.pid"
 end
 
@@ -235,4 +237,5 @@ function cleanup_ln
 	rm -Rf /tmp/l2-regtest/
 	rm -Rf /tmp/l3-regtest/
 	rm -Rf "$PATH_TO_BITCOIN/regtest"
+	find /tmp/ -name "[0-9]*" | xargs rm
 end
