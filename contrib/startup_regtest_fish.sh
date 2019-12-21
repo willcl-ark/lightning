@@ -113,9 +113,9 @@ function start_ln
 	end
 
 	# Start the lightning nodes
-	test -f /tmp/l1-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l1-regtest --plugin=/Users/will/src/lnproxy/scripts/gotenna.py
-	test -f /tmp/l2-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l2-regtest --plugin=/Users/will/src/lnproxy/scripts/gotenna.py
-	test -f /tmp/l3-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l3-regtest --plugin=/Users/will/src/lnproxy/scripts/gotenna.py
+	test -f /tmp/l1-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l1-regtest --dev-force-privkey=eb8d0246d2ee217a768f462ac2b8ca146013316267d6cf81a2abd72e9afd39f4 --plugin=/Users/will/src/lnproxy/scripts/gotenna.py
+	test -f /tmp/l2-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l2-regtest --dev-force-privkey=eafe2020dd386535ee970745e145242490341ffbde7600b468afccc56ecaa7d1 --plugin=/Users/will/src/lnproxy/scripts/gotenna.py
+	test -f /tmp/l3-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l3-regtest --dev-force-privkey=fa94873254c9e347cf9ef11368f74a3f1a40397f3ccb52a9311934bf90ed86e8 --plugin=/Users/will/src/lnproxy/scripts/gotenna.py
 
 	# fund the nodes
 	fund_ln
