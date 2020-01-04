@@ -651,7 +651,7 @@ const u8 *send_htlc_out(const tal_t *ctx,
 	/* Give channel 30 seconds to commit (first) htlc. */
 	if (!out->htlc_timeout && !IFDEV(out->peer->ld->dev_no_htlc_timeout, 0))
 		out->htlc_timeout = new_reltimer(out->peer->ld->timers,
-						 out, time_from_sec(30),
+						 out, time_from_sec(300),
 						 htlc_offer_timeout,
 						 out);
 	msg = towire_channel_offer_htlc(out, amount, cltv, payment_hash,
