@@ -55,38 +55,56 @@ fi
 if [ -z "$PATH_TO_BITCOIN" ]; then
 	if [ -d "$HOME/.bitcoin" ]; then
 		PATH_TO_BITCOIN="$HOME/.bitcoin"
-	elif [ -d "$HOME/Library/Application Support/Bitcoin" ]; then
-	  PATH_TO_BITCOIN="$HOME/Library/Application Support/Bitcoin"
+		echo PATH_TO_BITCOIN is "$PATH_TO_BITCOIN"
 	else
 		echo "\$PATH_TO_BITCOIN not set to a .bitcoin dir?" >&2
 		return
 	fi
 fi
 
-mkdir -p /tmp/l1-regtest /tmp/l2-regtest
+mkdir -p /tmp/l1-regtest /tmp/l2-regtest /tmp/l3-regtest
 
 # Node one config
-cat << 'EOF' > /tmp/l1-regtest/config
+cat << EOF > /tmp/l1-regtest/config
 network=regtest
 daemon
 log-level=debug
 log-file=/tmp/l1-regtest/log
-addr=localhost:6060
+bind-addr=/tmp/l1-regtest/unix_socket
+plugin=$PLUGIN_PATH
+gid=1000001
+rescan=5
 EOF
 
-cat << 'EOF' > /tmp/l2-regtest/config
+cat << EOF > /tmp/l2-regtest/config
 network=regtest
 daemon
 log-level=debug
 log-file=/tmp/l2-regtest/log
-addr=localhost:9090
+bind-addr=/tmp/l2-regtest/unix_socket
+plugin=$PLUGIN_PATH
+gid=1000002
+rescan=5
+EOF
+
+cat << EOF > /tmp/l3-regtest/config
+network=regtest
+daemon
+log-level=debug
+log-file=/tmp/l3-regtest/log
+bind-addr=/tmp/l3-regtest/unix_socket
+plugin=$PLUGIN_PATH
+gid=1000003
+rescan=5
 EOF
 
 alias l1-cli='$LCLI --lightning-dir=/tmp/l1-regtest'
 alias l2-cli='$LCLI --lightning-dir=/tmp/l2-regtest'
+alias l3-cli='$LCLI --lightning-dir=/tmp/l3-regtest'
 alias bt-cli='bitcoin-cli -regtest'
 alias l1-log='less /tmp/l1-regtest/log'
 alias l2-log='less /tmp/l2-regtest/log'
+alias l3-log='less /tmp/l3-regtest/log'
 
 start_ln() {
 	# Start bitcoind in the background
@@ -106,40 +124,55 @@ start_ln() {
 		"$LIGHTNINGD" --lightning-dir=/tmp/l1-regtest
 	test  -f /tmp/l2-regtest/lightningd-regtest.pid || \
 		"$LIGHTNINGD" --lightning-dir=/tmp/l2-regtest
+	test  -f /tmp/l3-regtest/lightningd-regtest.pid || \
+		"$LIGHTNINGD" --lightning-dir=/tmp/l3-regtest
 
 	# Give a hint.
-	echo "Commands: l1-cli, l2-cli, bt-cli, connect_ln, fund_ln, channel_ln, l1_pay_l2, l1_pay_l2, stop_ln, cleanup_ln"
+	echo "Commands: l1-cli, l2-cli, l3-cli, l[1|2|3]-log, bt-cli, stop_ln, cleanup_ln"
 }
 
-connect_ln() {
-  l1-cli connect \
-    $(l2-cli getinfo | jq '.id') \
-    $(l2-cli getinfo | jq -r '.binding[].address') \
-    $(l2-cli getinfo | jq -r '.binding[].port')
-}
-
-fund_ln() {
-  # Generate 288 blocks to activate segwit then send 1 BTC to each lightning node, confirming it with 6 more blocks
-  bt-cli generatetoaddress 288 $(bt-cli getnewaddress "" bech32)
+fund_ln () {
+  # Generate 101 blocks to mature a block then send 1 BTC to each lightning node, confirming it with 6 more blocks
+  bt-cli generatetoaddress 101 $(bt-cli getnewaddress "" bech32)
   bt-cli sendtoaddress $(l1-cli newaddr | jq -r '.bech32') 1
   bt-cli sendtoaddress $(l2-cli newaddr | jq -r '.bech32') 1
+  bt-cli sendtoaddress $(l3-cli newaddr | jq -r '.bech32') 1
   bt-cli generatetoaddress 6 $(bt-cli getnewaddress "" bech32)
 }
 
-channel_ln() {
-  # Open a new channel from l1 to l2 with max amount
-  l1-cli fundchannel $(l2-cli getinfo | jq .id) 16777215 10000
+add_nodes () {
+  # Add the other nodes to the routing tables by GID and node id
+  l1-cli add-node 1000002 $(l2-cli getinfo | jq .id)
+  l1-cli add-node 1000003 $(l3-cli getinfo | jq .id)
+
+  l2-cli add-node 1000001 $(l1-cli getinfo | jq .id)
+  l2-cli add-node 1000003 $(l3-cli getinfo | jq .id)
+
+  l3-cli add-node 1000001 $(l1-cli getinfo | jq .id)
+  l3-cli add-node 1000002 $(l2-cli getinfo | jq .id)
+}
+
+connect_ln_proxy () {
+  # Connect l1 to l2 and l2 to l3
+  l1-cli proxy-connect 1000002
+  l2-cli proxy-connect 1000003
+}
+
+channel_ln_priv () {
+  # Open a new channel from l1 to l2 and from l2 to l3 with 5,000,000 satoshis
+  l1-cli fundchannel $(l2-cli getinfo | jq .id) 5000000 10000 false
+  l2-cli fundchannel $(l3-cli getinfo | jq .id) 5000000 10000 false
   bt-cli generatetoaddress 6 $(bt-cli getnewaddress "" bech32)
 }
 
-l1_pay_l2() {
-  # l1 will pay l2 an amount passed as argument
-  l1-cli pay $(l2-cli invoice $argv $(openssl rand -hex 12) $(openssl rand -hex 12) | jq -r '.bolt11')
+l1_pay_l2 () {
+  # l1 will pay l2 500_000 msatoshis
+  l1-cli pay $(l2-cli invoice 500000 $(openssl rand -hex 12) $(openssl rand -hex 12) | jq -r '.bolt11')
 }
 
-l2_pay_l1() {
-  # l2 will pay l1 an amount passed as argument
-  l2-cli pay $(l1-cli invoice $argv $(openssl rand -hex 12) $(openssl rand -hex 12) | jq -r '.bolt11')
+l2_pay_l3 () {
+  # l2 will pay l3 500_000 msatoshis
+  l2-cli pay $(l3-cli invoice 500000 $(openssl rand -hex 12) $(openssl rand -hex 12) | jq -r '.bolt11')
 }
 
 stop_ln() {
@@ -152,19 +185,23 @@ stop_ln() {
 	test ! -f "$PATH_TO_BITCOIN/regtest/bitcoind.pid" || \
 		(kill "$(cat "$PATH_TO_BITCOIN/regtest/bitcoind.pid")"; \
 		rm "$PATH_TO_BITCOIN/regtest/bitcoind.pid")
+	pkill -f $PLUGIN_PATH
+	find /tmp/ -name "[0-9]*" | xargs rm
 }
 
 cleanup_ln() {
 	stop_ln
 	unalias l1-cli
 	unalias l2-cli
+	unalias l3-cli
 	unalias bt-cli
+	unalias l1-log
+	unalias l2-log
+	unalias l3-log
 	unset -f start_ln
-	unset -f connect_ln
-	unset -f fund_ln
-	unset -f channel_ln
-	unset -f l1_pay_l2
-	unset -f l2_pay_l1
 	unset -f stop_ln
 	unset -f cleanup_ln
+	unset -f fund_ln
+	unset -f add_nodes
+	unset -f connect_ln_proxy
 }
