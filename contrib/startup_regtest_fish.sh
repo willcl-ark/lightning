@@ -1,35 +1,35 @@
 #!/bin/fish
 
-## Short fish shell script to startup two local nodes with
-## bitcoind, all running on regtest
-## Makes it easier to test things out, by hand.
+# Short fish shell script to startup two local nodes with
+# bitcoind, all running on regtest
+# Makes it easier to test things out, by hand.
 
-## Should be called by source since it sets aliases
-##
-##  First load this file up.
-##
-##  $ source contrib/startup_regtest.sh
-##
-##  Start up the nodeset
-##
-##  $ start_ln
-##
-##  Let's connect the nodes.
-##
-##  $ l2-cli getinfo | jq .id
-##    "02b96b03e42d9126cb5228752c575c628ad09bdb7a138ec5142bbca21e244ddceb"
-##  $ l2-cli getinfo | jq .binding[0].port
-##    9090
-##  $ l1-cli connect 02b96b03e42d9126cb5228752c575c628ad09bdb7a138ec5142bbca21e244ddceb@localhost:9090
-##    {
-##      "id" : "030b02fc3d043d2d47ae25a9306d98d2abb7fc9bee824e68b8ce75d6d8f09d5eb7"
-##    }
-##
-##  When you're finished, clean up or stop
-##
-##  $ stop_ln  # stops the services, keeps the aliases
-##  $ cleanup_ln # stops and cleans up aliases
-##
+# Should be called by source since it sets aliases
+#
+#  First load this file up.
+#
+#  $ source contrib/startup_regtest.sh
+#
+#  Start up the nodeset
+#
+#  $ start_ln
+#
+#  Let's connect the nodes.
+#
+#  $ l2-cli getinfo | jq .id
+#    "02b96b03e42d9126cb5228752c575c628ad09bdb7a138ec5142bbca21e244ddceb"
+#  $ l2-cli getinfo | jq .binding[0].port
+#    9090
+#  $ l1-cli connect 02b96b03e42d9126cb5228752c575c628ad09bdb7a138ec5142bbca21e244ddceb@localhost:9090
+#    {
+#      "id" : "030b02fc3d043d2d47ae25a9306d98d2abb7fc9bee824e68b8ce75d6d8f09d5eb7"
+#    }
+#
+#  When you're finished, clean up or stop
+#
+#  $ stop_ln  # stops the services, keeps the aliases
+#  $ cleanup_ln # stops and cleans up aliases
+#
 
 # Do the Right Thing if we're currently in top of srcdir.
 if [ -z $PATH_TO_LIGHTNING ] && [ -x cli/lightning-cli ] && [ -x lightningd/lightningd ]
@@ -67,28 +67,34 @@ mkdir -p /tmp/l1-regtest /tmp/l2-regtest /tmp/l3-regtest
 # Node one config
 echo "network=regtest
 daemon
-log-level=io
+log-level=debug
 log-file=/tmp/l1-regtest/log
-#addr=localhost:6060
-bind-addr=/tmp/l1-regtest/unix_socket" > /tmp/l1-regtest/config
+bind-addr=/tmp/l1-regtest/unix_socket
+plugin=/Users/will/src/lnproxy2/plugin/gotenna.py
+gid=1000001
+rescan=5" > /tmp/l1-regtest/config
 
 # Node two config
 echo "network=regtest
 network=regtest
 daemon
-log-level=io
+log-level=debug
 log-file=/tmp/l2-regtest/log
-#addr=localhost:9090
-bind-addr=/tmp/l2-regtest/unix_socket" > /tmp/l2-regtest/config
+bind-addr=/tmp/l2-regtest/unix_socket
+plugin=/Users/will/src/lnproxy2/plugin/gotenna.py
+gid=1000002
+rescan=5" > /tmp/l2-regtest/config
 
 # Node three config
 echo "network=regtest
 network=regtest
 daemon
-log-level=io
+log-level=debug
 log-file=/tmp/l3-regtest/log
-#addr=localhost:12120
-bind-addr=/tmp/l3-regtest/unix_socket" > /tmp/l3-regtest/config
+bind-addr=/tmp/l3-regtest/unix_socket
+plugin=/Users/will/src/lnproxy2/plugin/gotenna.py
+gid=1000003
+rescan=5" > /tmp/l3-regtest/config
 
 alias l1-cli='$LCLI --lightning-dir=/tmp/l1-regtest'
 alias l2-cli='$LCLI --lightning-dir=/tmp/l2-regtest'
@@ -113,20 +119,37 @@ function start_ln
 	end
 
 	# Start the lightning nodes
-	test -f /tmp/l1-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l1-regtest --dev-force-privkey=eb8d0246d2ee217a768f462ac2b8ca146013316267d6cf81a2abd72e9afd39f4 --plugin=/Users/will/src/lnproxy/scripts/gotenna.py
-	test -f /tmp/l2-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l2-regtest --dev-force-privkey=eafe2020dd386535ee970745e145242490341ffbde7600b468afccc56ecaa7d1 --plugin=/Users/will/src/lnproxy/scripts/gotenna.py
-	test -f /tmp/l3-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l3-regtest --dev-force-privkey=fa94873254c9e347cf9ef11368f74a3f1a40397f3ccb52a9311934bf90ed86e8 --plugin=/Users/will/src/lnproxy/scripts/gotenna.py
+	test -f /tmp/l1-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l1-regtest
+	test -f /tmp/l2-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l2-regtest
+	test -f /tmp/l3-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l3-regtest
 
 	# fund the nodes
 	fund_ln
 
 	# Give a hint.
-	echo "Commands: l1-cli, l2-cli, l3-cli, bt-cli, fund_ln, connect_ln, connect_ln_proxy, channel_ln, channel_ln_priv, l1_pay_l2,
-	l1_pay_l3, l2_pay_l1, l2_pay_l3, 13_pay_l1, l3_pay_l1, stop_ln, cleanup_ln, set_ln_fees"
+	echo "Commands: l1-cli, l2-cli, l3-cli, bt-cli, fund_ln, add_nodes, connect_ln, connect_ln_proxy, channel_ln,
+	channel_ln_priv, l1_pay_l2,	l1_pay_l3, l2_pay_l1, l2_pay_l3, 13_pay_l1, l3_pay_l1, stop_ln, cleanup_ln, set_ln_fees"
+end
+
+function restart_ln
+	
+  test ! -f /tmp/l1-regtest/lightningd-regtest.pid || kill (cat "/tmp/l1-regtest/lightningd-regtest.pid"); rm /tmp/l1-regtest/lightningd-regtest.pid
+	test ! -f /tmp/l2-regtest/lightningd-regtest.pid || kill (cat "/tmp/l2-regtest/lightningd-regtest.pid"); rm /tmp/l2-regtest/lightningd-regtest.pid
+	test ! -f /tmp/l3-regtest/lightningd-regtest.pid || kill (cat "/tmp/l3-regtest/lightningd-regtest.pid"); rm /tmp/l3-regtest/lightningd-regtest.pid
+	# kill any plugins that might still be floating around
+	pkill -f /Users/will/src/lnproxy/plugin/gotenna.py
+	pkill -f /Users/will/src/lnproxy2/plugin/gotenna.py
+	find /tmp/ -name "[0-9]*" | xargs rm
+
+	# Start the lightning nodes
+	test -f /tmp/l1-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l1-regtest
+	test -f /tmp/l2-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l2-regtest
+	test -f /tmp/l3-regtest/lightningd-regtest.pid || $LIGHTNINGD --lightning-dir=/tmp/l3-regtest
+
 end
 
 function fund_ln
-  # Generate 288 blocks to activate segwit then send 1 BTC to each lightning node, confirming it with 6 more blocks
+  # Generate 101 blocks to mature a block then send 1 BTC to each lightning node, confirming it with 6 more blocks
   bt-cli generatetoaddress 101 (bt-cli getnewaddress "" bech32)
   bt-cli sendtoaddress (l1-cli newaddr | jq -r '.bech32') 1
   bt-cli sendtoaddress (l2-cli newaddr | jq -r '.bech32') 1
@@ -140,10 +163,24 @@ function connect_ln
   l2-cli connect (l3-cli getinfo | jq .id) (l3-cli getinfo | jq .binding[].socket)
 end
 
+function add_nodes
+  # Add the other nodes to the routing tables by GID and node id
+  l1-cli add-node 1000002 (l2-cli getinfo | jq .id)
+  l1-cli add-node 1000003 (l3-cli getinfo | jq .id)
+
+  l2-cli add-node 1000001 (l1-cli getinfo | jq .id)
+  l2-cli add-node 1000003 (l3-cli getinfo | jq .id)
+
+  l3-cli add-node 1000001 (l1-cli getinfo | jq .id)
+  l3-cli add-node 1000002 (l2-cli getinfo | jq .id)
+end
+
 function connect_ln_proxy
-  # Connect l1 to l2 and l2 to l3 via their proxy listening addresses
-  l1-cli proxy-connect (l2-cli getinfo | jq .id) (l2-cli proxy-addr | jq .addr)
-  l2-cli proxy-connect (l3-cli getinfo | jq .id) (l3-cli proxy-addr | jq .addr)
+  # Add the other nodes to the routing tables
+  add_nodes
+  # Connect l1 to l2 and l2 to l3
+  l1-cli proxy-connect 1000002
+  l2-cli proxy-connect 1000003
 end
 
 function channel_ln
@@ -155,9 +192,9 @@ function channel_ln
 end
 
 function channel_ln_priv
-  # Open a new channel from l1 to l2 and from l2 to l3 with max amount
-  l1-cli fundchannel (l2-cli getinfo | jq .id) 16777215 10000 false
-  l2-cli fundchannel (l3-cli getinfo | jq .id) 16777215 10000 false
+  # Open a new channel from l1 to l2 and from l2 to l3 with 5,000,000 satoshis
+  l1-cli fundchannel (l2-cli getinfo | jq .id) 5000000 10000 false
+  l2-cli fundchannel (l3-cli getinfo | jq .id) 5000000 10000 false
   bt-cli generatetoaddress 6 (bt-cli getnewaddress "" bech32)
   set_ln_fees 0 0
 end
@@ -177,32 +214,33 @@ end
 
 function l1_pay_l2
   # l1 will pay l2 an amount passed as argument
-  l1-cli pay (l2-cli invoice $argv (openssl rand -hex 12) (openssl rand -hex 12) | jq -r '.bolt11')
+#  l1-cli pay (l2-cli invoice $argv (openssl rand -hex 12) (openssl rand -hex 12) | jq -r '.bolt11')
+  l1-cli pay (l2-cli invoice 500000 (openssl rand -hex 12) (openssl rand -hex 12) | jq -r '.bolt11')
 end
 
 function l1_pay_l3
   # l1 will pay l2 an amount passed as argument
-  l1-cli pay (l3-cli invoice $argv (openssl rand -hex 12) (openssl rand -hex 12) | jq -r '.bolt11')
+  l1-cli pay (l3-cli invoice 500000 (openssl rand -hex 12) (openssl rand -hex 12) | jq -r '.bolt11')
 end
 
 function l2_pay_l1
   # l2 will pay l1 an amount passed as argument
-  l2-cli pay (l1-cli invoice $argv (openssl rand -hex 12) (openssl rand -hex 12) | jq -r '.bolt11')
+  l2-cli pay (l1-cli invoice 500000 (openssl rand -hex 12) (openssl rand -hex 12) | jq -r '.bolt11')
 end
 
 function l2_pay_l3
   # l2 will pay l1 an amount passed as argument
-  l2-cli pay (l3-cli invoice $argv (openssl rand -hex 12) (openssl rand -hex 12) | jq -r '.bolt11')
+  l2-cli pay (l3-cli invoice 500000 (openssl rand -hex 12) (openssl rand -hex 12) | jq -r '.bolt11')
 end
 
 function l3_pay_l1
   # l2 will pay l1 an amount passed as argument
-  l3-cli pay (l1-cli invoice $argv (openssl rand -hex 12) (openssl rand -hex 12) | jq -r '.bolt11')
+  l3-cli pay (l1-cli invoice 500000 (openssl rand -hex 12) (openssl rand -hex 12) | jq -r '.bolt11')
 end
 
 function l3_pay_l2
   # l2 will pay l1 an amount passed as argument
-  l3-cli pay (l2-cli invoice $argv (openssl rand -hex 12) (openssl rand -hex 12) | jq -r '.bolt11')
+  l3-cli pay (l2-cli invoice 500000 (openssl rand -hex 12) (openssl rand -hex 12) | jq -r '.bolt11')
 end
 
 function stop_ln
@@ -211,7 +249,8 @@ function stop_ln
 	test ! -f /tmp/l2-regtest/lightningd-regtest.pid || kill (cat "/tmp/l2-regtest/lightningd-regtest.pid"); rm /tmp/l2-regtest/lightningd-regtest.pid
 	test ! -f /tmp/l3-regtest/lightningd-regtest.pid || kill (cat "/tmp/l3-regtest/lightningd-regtest.pid"); rm /tmp/l3-regtest/lightningd-regtest.pid
 	# kill any plugins that might still be floating around
-	pkill -f /Users/will/src/lnproxy/scripts/gotenna.py
+	pkill -f /Users/will/src/lnproxy/plugin/gotenna.py
+	pkill -f /Users/will/src/lnproxy2/plugin/gotenna.py
 	test ! -f "$PATH_TO_BITCOIN/regtest/bitcoind.pid" || kill (cat "$PATH_TO_BITCOIN/regtest/bitcoind.pid"); rm "$PATH_TO_BITCOIN/regtest/bitcoind.pid"
 end
 
@@ -226,6 +265,11 @@ function cleanup_ln
 	functions -e l3-log
 	functions -e bt-cli
 	functions -e start_ln
+	functions -e restart_ln
+	functions -e fund_ln
+	functions -e connect_ln
+	functions -e connect_ln_proxy
+	functions -e add_nodes
 	functions -e stop_ln
 	functions -e cleanup_ln
 	functions -e set_ln_fees
