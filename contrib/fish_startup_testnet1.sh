@@ -26,11 +26,6 @@ else
 	echo lightningd is "$LIGHTNINGD"
 end
 
-if [ -z "$GID" ]
-  echo "Please set variable GID first"
-  exit
-end
-
 mkdir -p /tmp/l1-testnet
 
 # Node config
@@ -43,7 +38,6 @@ rescan=5
 
 # lnproxy config
 onion-tool-path=$PATH_TO_LIGHTNING/devtools/onion
-gid=$GID
 
 # sauron config
 disable-plugin=bcli
@@ -95,7 +89,6 @@ function cleanup_ln
 	set -e PATH_TO_LIGHTNING
 	set -e LIGHTNINGD
 	set -e LCLI
-	find /tmp/ -name "[0-9]*" | xargs rm
   while true
     read --prompt "echo 'Do you wish to remove C-Lightning datadir? If using testnet, this will erase any coins in the wallet/channels!!!: ' " -l answer
     switch "$answer"

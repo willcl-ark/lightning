@@ -32,12 +32,6 @@ else
 	echo lightningd is "$LIGHTNINGD"
 fi
 
-if [ -z "$GID" ]; then
-  echo "Please set variable GID first"
-  return
-fi
-
-
 mkdir -p /tmp/l1-testnet
 
 # Node config
@@ -51,7 +45,6 @@ rescan=5
 
 # lnproxy config
 onion-tool-path=$PATH_TO_LIGHTNING/devtools/onion
-gid=$GID
 
 # sauron config
 disable-plugin=bcli
@@ -78,16 +71,11 @@ restart_ln() {
   start_ln
 }
 
-test_msg_ln() {
-  l1-cli waitsendpay $(l1-cli message $(l2-cli gid) $(openssl rand -hex 12) 100000 | jq -r '.payment_hash')
-}
-
 stop_ln() {
 	test ! -f /tmp/l1-testnet/lightningd-testnet.pid || \
 		(kill "$(cat /tmp/l1-testnet/lightningd-testnet.pid)"; \
 		rm /tmp/l1-testnet/lightningd-testnet.pid)
 	pkill -f "$PATH_TO_LIGHTNING/lightningd/../plugins/lnproxy.py"
-	find /tmp/ -name "[0-9]*" | xargs rm
 }
 
 cleanup_ln() {
@@ -98,7 +86,6 @@ cleanup_ln() {
 	unset -f test_msg_ln
 	unset -f restart_ln
 	unset -f stop_ln
-	find /tmp/ -name "[0-9]*" | xargs rm
 	while true; do
     read -p "Do you wish to remove C-Lightning datadir? If using testnet, this will erase any coins in the wallet/channels!!!" yn
     case $yn in
