@@ -75,7 +75,6 @@ stop_ln() {
 	test ! -f /tmp/l1-testnet/lightningd-testnet.pid || \
 		(kill "$(cat /tmp/l1-testnet/lightningd-testnet.pid)"; \
 		rm /tmp/l1-testnet/lightningd-testnet.pid)
-	pkill -f "$PATH_TO_LIGHTNING/lightningd/../plugins/lnproxy.py"
 }
 
 cleanup_ln() {

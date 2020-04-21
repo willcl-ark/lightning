@@ -48,33 +48,22 @@ alias l1-cli='$LCLI --lightning-dir=/tmp/l1-testnet'
 alias l1-log='less /tmp/l1-testnet/log'
 
 function start_ln
-
-	# Start the lightning nodes
+	# Start the lightning node
 	test -f /tmp/l1-testnet/lightningd-testnet.pid || $LIGHTNINGD --lightning-dir=/tmp/l1-testnet
-
 	# Give a hint.
 	echo "Commands: l1-cli, proxy-connect, channel_ln, stop_ln, cleanup_ln"
 end
 
 function restart_ln
-
   test ! -f /tmp/l1-testnet/lightningd-testnet.pid || kill (cat "/tmp/l1-testnet/lightningd-testnet.pid"); rm /tmp/l1-testnet/lightningd-testnet.pid
-	# kill any plugins that might still be floating around
-	pkill -f "$PATH_TO_LIGHTNING/plugins/lnproxy.py"
-	find /tmp/ -name "[0-9]*" | xargs rm
-
 	sleep 1
-
-	# Start the lightning nodes
+	# Start the lightning node
 	test -f /tmp/l1-testnet/lightningd-testnet.pid || $LIGHTNINGD --lightning-dir=/tmp/l1-testnet
-
 end
 
 function stop_ln
-  # Stop both lightning nodes and bitcoind
+  # Stop the lightning node
 	test ! -f /tmp/l1-testnet/lightningd-testnet.pid || kill (cat "/tmp/l1-testnet/lightningd-testnet.pid"); rm /tmp/l1-testnet/lightningd-testnet.pid
-	# kill any plugins that might still be floating around
-	pkill -f "$PATH_TO_LIGHTNING/lightningd/../plugins/lnproxy.py"
 end
 
 function cleanup_ln

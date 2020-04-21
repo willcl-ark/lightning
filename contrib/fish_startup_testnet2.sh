@@ -99,37 +99,37 @@ end
 
 function add_nodes
   # Add the other nodes to the routing tables by node id, address and listening port
-  l1-cli add-node (l2-cli getinfo | jq .id) "127.0.0.1:22222" 11111
-  l2-cli add-node (l1-cli getinfo | jq .id) "127.0.0.1:11111" 22222
+  l1-cli add-node (l2-cli getinfo | jq -r .id)"@127.0.0.1:22222" 11111
+  l2-cli add-node (l1-cli getinfo | jq -r .id)"@127.0.0.1:11111" 22222
 end
 
 function connect_ln_proxy
   # Add the other nodes to the routing tables
   add_nodes
   # Connect l1 to l2 and l2 to l3
-  l1-cli proxy-connect (l2-cli getinfo | jq .id)
+  l1-cli proxy-connect (l2-cli getinfo | jq -r .id)
 end
 
 
 function channel_ln_priv
   # Open a new channel from l1 to l2 and from l2 to l3 with 100,000 satoshis
-  l1-cli fundchannel (l2-cli getinfo | jq .id) 100000 10000 false
+  l1-cli fundchannel (l2-cli getinfo | jq -r .id) 100000 10000 false
   set_ln_fees 0 0
 end
 
 function set_ln_fees
   # Set the fees for all channels to zero
-  for channel in (l1-cli listfunds | jq .channels[].peer_id)
+  for channel in (l1-cli listfunds | jq -r .channels[].peer_id)
     l1-cli setchannelfee $channel $argv[1] $argv[2]
   end
-  for channel in (l2-cli listfunds | jq .channels[].peer_id)
+  for channel in (l2-cli listfunds | jq -r .channels[].peer_id)
     l2-cli setchannelfee $channel $argv[1] $argv[2]
   end
 end
 
 function ping_ln
   # Ping the nodes so pings don't interrupt us
-  l1-cli ping (l2-cli getinfo | jq .id)
+  l1-cli ping (l2-cli getinfo | jq -r .id)
 end
 
 function l1_pay_l2
@@ -152,8 +152,6 @@ function stop_ln
   # Stop both lightning nodes and bitcoind
 	test ! -f /tmp/l1-testnet/lightningd-testnet.pid || kill (cat "/tmp/l1-testnet/lightningd-testnet.pid"); rm /tmp/l1-testnet/lightningd-testnet.pid
 	test ! -f /tmp/l2-testnet/lightningd-testnet.pid || kill (cat "/tmp/l2-testnet/lightningd-testnet.pid"); rm /tmp/l2-testnet/lightningd-testnet.pid
-	# kill any plugins that might still be floating around
-	pkill -f "$PATH_TO_LIGHTNING/lightningd/../plugins/lnproxy.py"
 end
 
 function cleanup_ln
